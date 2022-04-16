@@ -22,7 +22,7 @@ class Net(nn.Module):
                                        nn.Linear(64, 32),
                                        nn.ReLU(),
                                        nn.Dropout(p = 0.3),
-                                       nn.Linear(32, 1),
+                                       nn.Linear(32, input_dim),
                                        nn.Sigmoid())
 
     def forward(self, x):
@@ -46,7 +46,6 @@ class Train_Base:
 
         self.optimizer = torch.optim.SGD(model.parameters(), lr = 1e-2, momentum = 0.9, weight_decay = 2.0e-4, nesterov=True)
         self.lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer =  self.optimizer, T_max = len( self.train_dataloader)* self.num_epochs, eta_min = 5e-4)     
-        self.loss_func = torch.nn.MSELoss()
 
     def train(self):
         pbar = tqdm(initial=0, total = self.num_epochs)
@@ -57,9 +56,8 @@ class Train_Base:
             for batch_idx, (x, y) in enumerate(self.train_dataloader):
                 x = x.to(self.device).float()
                 y = y.to(self.device).float()
-                y = torch.unsqueeze(y, 1)
                 yhat = self.model(x) 
-                loss_task = self.loss_func(yhat, y)
+                loss_task = self.loss_func(y, yhat, x)
                 loss_task_epoch.append(loss_task.item())  
                 self.optimizer.zero_grad()
                 loss_task.backward()  
@@ -73,14 +71,20 @@ class Train_Base:
     def test(self):
         self.model.eval()
         with torch.no_grad():
+            x_all = []
             y_all = []
             y_hat_all = []
             for id_batch, (x, y) in enumerate(self.test_dataloader):
                 x = x.to(self.device).float()
                 y = y.to(self.device).float()
-                y = torch.unsqueeze(y, 1)
                 yhat = self.model(x)  
+                yhat = torch.where(x >= 0, y, yhat)
+                x_all = x_all + x.detach().cpu().tolist()
                 y_all = y_all + y.detach().cpu().tolist()
                 y_hat_all = y_hat_all + yhat.detach().cpu().tolist()
                 
-        return y_all, y_hat_all
+        return x_all, y_all, y_hat_all
+
+    def loss_func(self, y, yhat, x):
+        yhat = torch.where(x >= 0, y, yhat)
+        return torch.nn.functional.mse_loss(y ,yhat)

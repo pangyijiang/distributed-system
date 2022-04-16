@@ -8,7 +8,7 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset, DataLoader
 
-seed = 1#np.random.randint(0, 1000000)
+seed = 0#np.random.randint(0, 1000000)
 
 if seed is not None:
     torch.manual_seed(seed)
@@ -29,6 +29,7 @@ def trans_class_rate(num_class, n_local_pickle = "data.pickle"):
         dataset_rating = np.stack(np.split(dataset_rating, num_class, axis = 1), axis = 1)
         dataset_rating = np.nanmean(dataset_rating, axis=2)
         dataset_rating = np.nan_to_num(dataset_rating, nan = 0.0)
+        dataset_rating = np.round(dataset_rating, 1)
         SaveToPickleFile(dataset_rating, n_local_pickle)
     else:
         dataset_rating = LoadFromPickleFile(n_local_pickle)
@@ -46,10 +47,15 @@ class CustomImageDataset(Dataset):
 
     def __getitem__(self, idx):
         data = self.dataset_rating[idx]
-        label_loc = np.random.randint(0, self.n_class)
-        label_loc_onehot = np.ones(self.n_class)
-        label_loc_onehot[label_loc] = 0
-        return data*label_loc_onehot, data[label_loc]
+
+        label_hid_number = np.random.randint(1, int(self.n_class/2))
+        label_hid_loc = np.random.randint(0, self.n_class, label_hid_number)
+        label_hid_onehot = np.ones(self.n_class)
+        label_hid_onehot[label_hid_loc] = -1
+        data_hidden = data*label_hid_onehot
+        data_hidden[data_hidden < 0 ] = -1
+
+        return data_hidden, data
 
 
 def pre_dataloader(train_rate, num_class):
