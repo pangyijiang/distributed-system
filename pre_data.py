@@ -59,16 +59,19 @@ class CustomImageDataset(Dataset):
         return data_hidden, data
 
 
-def pre_dataloader(train_rate, num_class):
+def pre_dataloader(train_rate, num_class, argv):
     dataset_rating = trans_class_rate(num_class)
     data_train = dataset_rating[:int(train_rate*len(dataset_rating))]
     data_test = dataset_rating[int(train_rate*len(dataset_rating)):]
     training_data = CustomImageDataset(data_train)
     test_data = CustomImageDataset(data_test)
 
-
+    if torch.cuda.is_available():
+        torch.distributed.init_process_group(backend="nccl",rank=argv.local_rank, world_size=argv.world_size)
+    else:
+        torch.distributed.init_process_group(backend="gloo")
     train_sampler = DistributedSampler(dataset=training_data)
 
-    train_dataloader = DataLoader(training_data, sampler=train_sampler, batch_size=256, shuffle=True)
+    train_dataloader = DataLoader(training_data, sampler=train_sampler, batch_size=256, shuffle=False)
     test_dataloader = DataLoader(test_data, batch_size=64, shuffle=False)
     return train_dataloader, test_dataloader

@@ -12,12 +12,14 @@ def main():
     # Each process runs on 1 GPU device specified by the local_rank argument.
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--local_rank", type=int, default= 0, help="Local rank. Necessary for using the torch.distributed.launch utility.")
+    parser.add_argument("--world_size", type=int, default= 2, help="world size.")
     parser.add_argument("--num_class", type=int, default= 10, help="Number of class.")
     parser.add_argument("--num_epochs", type=int, default= 200, help="Number of training epoches.")
     argv = parser.parse_args()
 
-    train_dataloader, test_dataloader = pre_dataloader(train_rate = 0.8, num_class = argv.num_class)
     model = Net(input_dim = argv.num_class)
+    train_dataloader, test_dataloader = pre_dataloader(train_rate = 0.8, num_class = argv.num_class, argv = argv)
+    
     trainer = Train_Base(model, train_dataloader, test_dataloader, argv)
 
     trainer.train()

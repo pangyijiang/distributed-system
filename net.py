@@ -1,5 +1,6 @@
 import torch.nn as nn
 from tqdm import tqdm
+import torch.distributed as dist
 import torch
 import numpy as np
 import os
@@ -37,16 +38,13 @@ class Train_Base:
         self.test_dataloader = test_dataloader
         self.argv = argv
 
-        # Initializes the distributed backend which will take care of sychronizing nodes/GPUs
-        torch.distributed.init_process_group(backend="nccl")
         os.environ["CUDA_VISIBLE_DEVICES"] = "%d" % self.argv.local_rank
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = self.model.to(self.device) 
-        # if torch.cuda.device_count() > 1:
-        #     print("Let's use", torch.cuda.device_count(), "GPUs!")
-        #     model = nn.DataParallel(model)
-        #     model = model.to( self.device) 
-        self.ddp_model = torch.nn.parallel.DistributedDataParallel(self.model, device_ids=[self.argv.local_rank], output_device= self.argv.local_rank)
+        if torch.cuda.is_available():
+            self.ddp_model = torch.nn.parallel.DistributedDataParallel(self.model, device_ids=[self.argv.local_rank], output_device= self.argv.local_rank)
+        else:
+            self.ddp_model = torch.nn.parallel.DistributedDataParallel(self.model)
 
         self.optimizer = torch.optim.SGD(self.ddp_model.parameters(), lr = 1e-2, momentum = 0.9, weight_decay = 2.0e-4, nesterov=True)
         self.lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer =  self.optimizer, T_max = len( self.train_dataloader)* self.argv.num_epochs, eta_min = 5e-4)     
