@@ -4,7 +4,7 @@ from turtle import color
 from pre_data import pre_dataloader
 from net import Net, Train_Base
 from matplotlib import pyplot as plt
-import numpy as np
+import torch
 import argparse
 
 def main():
@@ -17,6 +17,11 @@ def main():
     parser.add_argument("--num_epochs", type=int, default= 200, help="Number of training epoches.")
     argv = parser.parse_args()
 
+
+    if torch.cuda.is_available():
+        torch.distributed.init_process_group(backend="nccl")
+    else:
+        torch.distributed.init_process_group(backend="gloo")
     model = Net(input_dim = argv.num_class)
     train_dataloader, test_dataloader = pre_dataloader(train_rate = 0.8, num_class = argv.num_class, argv = argv)
     

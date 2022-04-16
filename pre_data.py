@@ -66,10 +66,6 @@ def pre_dataloader(train_rate, num_class, argv):
     training_data = CustomImageDataset(data_train)
     test_data = CustomImageDataset(data_test)
 
-    if torch.cuda.is_available():
-        torch.distributed.init_process_group(backend="nccl",rank=argv.local_rank, world_size=argv.world_size)
-    else:
-        torch.distributed.init_process_group(backend="gloo")
     train_sampler = DistributedSampler(dataset=training_data)
 
     train_dataloader = DataLoader(training_data, sampler=train_sampler, batch_size=256, shuffle=False)
