@@ -31,32 +31,36 @@ class Net(nn.Module):
 
 class Train_Base:
     
-    def __init__(self, model, train_dataloader, test_dataloader, num_epochs = 100):
+    def __init__(self, model, train_dataloader, test_dataloader, argv):
         self.model = model
         self.train_dataloader = train_dataloader
         self.test_dataloader = test_dataloader
-        self.num_epochs = num_epochs
+        self.argv = argv
 
-        os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+        # Initializes the distributed backend which will take care of sychronizing nodes/GPUs
+        torch.distributed.init_process_group(backend="nccl")
+        os.environ["CUDA_VISIBLE_DEVICES"] = "%d" % self.argv.local_rank
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        if torch.cuda.device_count() > 1:
-            print("Let's use", torch.cuda.device_count(), "GPUs!")
-            model = nn.DataParallel(model)
-            model = model.to( self.device) 
+        self.model = self.model.to(self.device) 
+        # if torch.cuda.device_count() > 1:
+        #     print("Let's use", torch.cuda.device_count(), "GPUs!")
+        #     model = nn.DataParallel(model)
+        #     model = model.to( self.device) 
+        self.ddp_model = torch.nn.parallel.DistributedDataParallel(self.model, device_ids=[self.argv.local_rank], output_device= self.argv.local_rank)
 
-        self.optimizer = torch.optim.SGD(model.parameters(), lr = 1e-2, momentum = 0.9, weight_decay = 2.0e-4, nesterov=True)
-        self.lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer =  self.optimizer, T_max = len( self.train_dataloader)* self.num_epochs, eta_min = 5e-4)     
+        self.optimizer = torch.optim.SGD(self.ddp_model.parameters(), lr = 1e-2, momentum = 0.9, weight_decay = 2.0e-4, nesterov=True)
+        self.lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer =  self.optimizer, T_max = len( self.train_dataloader)* self.argv.num_epochs, eta_min = 5e-4)     
 
     def train(self):
-        pbar = tqdm(initial=0, total = self.num_epochs)
+        pbar = tqdm(initial=0, total = self.argv.num_epochs)
         pbar.set_description("epoch = 0, loss = None")
-        for epoch in range(0, self.num_epochs, 1):
-            self.model.train()       #model.train() doesn’t change param.requires_grad
+        for epoch in range(0, self.argv.num_epochs, 1):
+            self.ddp_model.train()       #model.train() doesn’t change param.requires_grad
             loss_task_epoch = []
             for batch_idx, (x, y) in enumerate(self.train_dataloader):
                 x = x.to(self.device).float()
                 y = y.to(self.device).float()
-                yhat = self.model(x) 
+                yhat = self.ddp_model(x) 
                 loss_task = self.loss_func(y, yhat, x)
                 loss_task_epoch.append(loss_task.item())  
                 self.optimizer.zero_grad()
@@ -69,7 +73,7 @@ class Train_Base:
             pbar.set_description(str_record)
 
     def test(self):
-        self.model.eval()
+        self.ddp_model.eval()
         with torch.no_grad():
             x_all = []
             y_all = []
@@ -77,7 +81,7 @@ class Train_Base:
             for id_batch, (x, y) in enumerate(self.test_dataloader):
                 x = x.to(self.device).float()
                 y = y.to(self.device).float()
-                yhat = self.model(x)  
+                yhat = self.ddp_model(x)  
                 yhat = torch.where(x >= 0, y, yhat)
                 x_all = x_all + x.detach().cpu().tolist()
                 y_all = y_all + y.detach().cpu().tolist()

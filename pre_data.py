@@ -7,6 +7,7 @@ import os
 import pandas as pd
 import torch
 from torch.utils.data import Dataset, DataLoader
+from torch.utils.data.distributed import DistributedSampler
 
 seed = 0#np.random.randint(0, 1000000)
 
@@ -65,6 +66,9 @@ def pre_dataloader(train_rate, num_class):
     training_data = CustomImageDataset(data_train)
     test_data = CustomImageDataset(data_test)
 
-    train_dataloader = DataLoader(training_data, batch_size=256, shuffle=True)
+
+    train_sampler = DistributedSampler(dataset=training_data)
+
+    train_dataloader = DataLoader(training_data, sampler=train_sampler, batch_size=256, shuffle=True)
     test_dataloader = DataLoader(test_data, batch_size=64, shuffle=False)
     return train_dataloader, test_dataloader
