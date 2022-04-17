@@ -1,11 +1,19 @@
 
-from cProfile import label
-from turtle import color
 from pre_data import pre_dataloader
 from net import Net, Train_Base
 from matplotlib import pyplot as plt
 import torch
 import argparse
+
+#docker cp Project node1:/workspace
+#pip install matplotlib
+#pip install tk
+#pip install pandas
+#apt update
+#apt install libsm6 libxext6 libxrender-dev
+#docker run -it --network=host --name=node1 pytorch/pytorch # --cpus=1 -p 12345:12345 
+#torchrun --master_addr="127.0.0.1" --master_port=1334 --nproc_per_node=1 --nnodes=2 --node_rank=0 main.py
+#python -m torch.distributed.launch --nproc_per_node=8 --nnodes=2 --node_rank=0 --master_addr="127.0.0.1" --master_port=1234 main.py
 
 def main():
 

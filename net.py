@@ -67,7 +67,10 @@ class Train_Base:
                 self.lr_scheduler.step()
             loss_epoch_avg = np.mean(loss_task_epoch)
             pbar.update(1)
-            str_record = "epoch = %d, loss = %.3f"%(epoch + 1, loss_epoch_avg)
+            if torch.distributed.get_rank() == 0:
+                str_record = "Master node - epoch = %d, loss = %.3f"%(epoch + 1, loss_epoch_avg)
+            else:
+                str_record = "Slaver node - epoch = %d, loss = %.3f"%(epoch + 1, loss_epoch_avg)
             pbar.set_description(str_record)
 
     def test(self):
