@@ -6,13 +6,13 @@ import torch
 import argparse
 
 #docker cp Project node1:/workspace
-#docker run -it --network=host --name=node2 --cpuset-cpus=2 pytorch/pytorch
+#docker run -it --network=host --name=node0 --cpuset-cpus=0 pytorch/pytorch
 #pip install matplotlib
 #pip install tk
 #pip install pandas
 #apt update
 #apt install libsm6 libxext6 libxrender-dev
-#torchrun --master_addr="127.0.0.1" --master_port=1355 --nproc_per_node=1 --nnodes=3 --node_rank=0 main.py
+#torchrun --master_addr="127.0.0.1" --master_port=1347 --nproc_per_node=1 --nnodes=3 --node_rank=0 main.py
 
 def main():
 

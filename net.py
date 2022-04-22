@@ -1,6 +1,7 @@
 import torch.nn as nn
 from tqdm import tqdm
 import torch.distributed as dist
+import psutil
 import torch
 import numpy as np
 import os
@@ -50,8 +51,7 @@ class Train_Base:
         self.lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer =  self.optimizer, T_max = len( self.train_dataloader)* self.argv.num_epochs, eta_min = 5e-4)     
 
     def train(self):
-        pbar = tqdm(initial=0, total = self.argv.num_epochs)
-        pbar.set_description("epoch = 0, loss = None")
+        print("\r" + "epoch = 0, loss = None", end = "")
         for epoch in range(0, self.argv.num_epochs, 1):
             self.ddp_model.train()       #model.train() doesn’t change param.requires_grad
             loss_task_epoch = []
@@ -66,12 +66,18 @@ class Train_Base:
                 self.optimizer.step()        
                 self.lr_scheduler.step()
             loss_epoch_avg = np.mean(loss_task_epoch)
-            pbar.update(1)
             if torch.distributed.get_rank() == 0:
-                str_record = "Master node - epoch = %d, loss = %.3f"%(epoch + 1, loss_epoch_avg)
+                str_record = "Master node - epoch = %d\%d, loss = %.3f"%(epoch + 1, self.argv.num_epochs, loss_epoch_avg)
+                info_dic = self.rec_info()
+                info_dic = ["Node%d_ram:%.1f%%_cpu:%.1f%%"%(k, info_dic[k][0], info_dic[k][1]) for k in info_dic]
+                info_dic = '  '.join(info_dic)
+                print("\r" + str_record + ",  Slave info - " + info_dic, end = "")
             else:
-                str_record = "Slaver node - epoch = %d, loss = %.3f"%(epoch + 1, loss_epoch_avg)
-            pbar.set_description(str_record)
+                str_record = "Slaver node - epoch = %d\%d, loss = %.3f"%(epoch + 1, self.argv.num_epochs, loss_epoch_avg)
+                print("\r" + str_record, end = "")
+                self.send_info()
+        print("\n")
+                
 
     def test(self):
         self.ddp_model.eval()
@@ -89,6 +95,23 @@ class Train_Base:
                 y_hat_all = y_hat_all + yhat.detach().cpu().tolist()
                 
         return x_all, y_all, y_hat_all
+
+
+    def send_info(self, target_rank = 0):
+        ram_info = psutil.virtual_memory().percent
+        cpu_info = psutil.cpu_percent()
+        info_send = torch.tensor([ram_info, cpu_info]) 
+        dist.send(info_send, dst = target_rank)
+
+    def rec_info(self):
+        world_size = dist.get_world_size()
+        info_dic = {k+1:None for k in range(world_size - 1)}
+        for r in range(world_size - 1):
+            info_rec = torch.tensor([0.0, 0.0]) 
+            dist.recv(info_rec, src = r + 1)
+            info_rec = info_rec.tolist()
+            info_dic[r + 1] = info_rec
+        return info_dic
 
     def loss_func(self, y, yhat, x):
         yhat = torch.where(x >= 0, y, yhat)
