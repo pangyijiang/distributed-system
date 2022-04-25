@@ -50,6 +50,9 @@ class Train_Base:
         self.optimizer = torch.optim.SGD(self.ddp_model.parameters(), lr = 1e-2, momentum = 0.9, weight_decay = 2.0e-4, nesterov=True)
         self.lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer =  self.optimizer, T_max = len( self.train_dataloader)* self.argv.num_epochs, eta_min = 5e-4)     
 
+        self.fea_in_hook = None
+        self.fea_out_hook = None
+
     def train(self):
         print("\r" + "epoch = 0, loss = None", end = "")
         for epoch in range(0, self.argv.num_epochs, 1):
@@ -116,3 +119,13 @@ class Train_Base:
     def loss_func(self, y, yhat, x):
         yhat = torch.where(x >= 0, y, yhat)
         return torch.nn.functional.mse_loss(y ,yhat)
+
+    def enable_hook(self, model, hook_func, n_layer = "layer3.4.bn2"):
+        for n, m in model.named_modules():
+            if n == n_layer:
+                m.register_forward_hook(hook = hook_func)
+
+    def hook_representation(self, module, fea_in, fea_out):
+        self.fea_in_hook = fea_in
+        self.fea_out_hook = fea_out
+        return None

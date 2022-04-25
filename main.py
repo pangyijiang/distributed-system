@@ -12,7 +12,7 @@ import argparse
 #pip install pandas
 #apt update
 #apt install libsm6 libxext6 libxrender-dev
-#torchrun --master_addr="127.0.0.1" --master_port=1347 --nproc_per_node=1 --nnodes=3 --node_rank=0 main.py
+#torchrun --master_addr="127.0.0.1" --master_port=1348 --nproc_per_node=1 --nnodes=3 --node_rank=0 main.py
 
 def main():
 
@@ -57,7 +57,7 @@ def main():
         axs[i].set_ylim([0, 5])
         axs[i].set_xticks([j for j in range(argv.num_class)]) 
     plt.legend()
-    plt.show()
+    plt.savefig("r.png")
 
 if __name__ == "__main__":
     main()
